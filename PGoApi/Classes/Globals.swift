@@ -107,3 +107,8 @@ public enum PGoAuthType: CustomStringConvertible {
         }
     }
 }
+
+public enum PGoApiStatus: Int {
+    case Success = 0
+    case Failure = 1
+}

@@ -41,7 +41,7 @@ public class PGoApiRequest {
         }
     }
 
-    public func makeRequest(intent: PGoApiIntent, delegate: PGoApiDelegate?) {
+    public func makeRequest(intent: PGoApiIntent, completion: (intent: PGoApiIntent, statusCode: PGoApiStatus?, response: PGoApiResponse?) -> Void) {
         // analogous to call in pgoapi.py
         
         if methodList.count == 0 {
@@ -59,8 +59,11 @@ public class PGoApiRequest {
             return
         }
         
-        let request = PGoRpcApi(subrequests: methodList, intent: intent, auth: self.auth!, api: self, delegate: delegate)
-        request.request()
+        let request = PGoRpcApi(subrequests: methodList, intent: intent, auth: self.auth!, api: self)
+        request.request({
+            responseIntent, statusCode, response in
+                completion(intent: responseIntent, statusCode: statusCode, response: response)
+        })
         methodList.removeAll()
     }
     

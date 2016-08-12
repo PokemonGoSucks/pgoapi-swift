@@ -16,7 +16,6 @@ import ProtocolBuffers
 class PGoRpcApi {
     let intent: PGoApiIntent
     var auth: PGoAuth
-    let delegate: PGoApiDelegate?
     let subrequests: [PGoApiMethod]
     let api: PGoApiRequest
     let encrypt: PGoEncrypt
@@ -25,7 +24,7 @@ class PGoRpcApi {
     private var requestId: UInt64 = 0
     private var manager: Manager? = nil
     
-    internal init(subrequests: [PGoApiMethod], intent: PGoApiIntent, auth: PGoAuth, api: PGoApiRequest, delegate: PGoApiDelegate?) {
+    internal init(subrequests: [PGoApiMethod], intent: PGoApiIntent, auth: PGoAuth, api: PGoApiRequest) {
         manager = auth.manager
         manager!.session.configuration.HTTPAdditionalHeaders = [
             "User-Agent": "Niantic App"
@@ -34,7 +33,6 @@ class PGoRpcApi {
         self.subrequests = subrequests
         self.intent = intent
         self.auth = auth
-        self.delegate = delegate
         self.api = api
         self.timeSinceStart = UInt64(NSDate().timeIntervalSince1970 * 1000.0)
         self.locationHex = NSData()
@@ -42,7 +40,7 @@ class PGoRpcApi {
         self.requestId = randomUInt64(UInt64(pow(Double(2),Double(62))), max: UInt64(pow(Double(2),Double(63))))
     }
     
-    internal func request() {
+    internal func request(completion: (intent: PGoApiIntent, statusCode: PGoApiStatus, response: PGoApiResponse?) -> Void) {
         let requestData = buildMainRequest().data()
         
         Alamofire.request(.POST, auth.endpoint, parameters: [:], encoding: .Custom({
@@ -54,12 +52,14 @@ class PGoRpcApi {
             let statusCode = response.response?.statusCode
             if statusCode != 200 {
                 print("Unexpected response code, should be 200, got \(statusCode)")
-                self.delegate?.didReceiveApiError(self.intent, statusCode: statusCode)
+//                self.delegate?.didReceiveApiError(self.intent, statusCode: statusCode)
+                completion(intent: self.intent, statusCode: .Failure, response: nil)
                 return
             }
             
             print("Got a response!")
-            self.delegate?.didReceiveApiResponse(self.intent, response: self.parseMainResponse(response.result.value!))
+            completion(intent: self.intent, statusCode: .Success, response: self.parseMainResponse(response.result.value!))
+//            self.delegate?.didReceiveApiResponse(self.intent, response: self.parseMainResponse(response.result.value!))
         }
     }
     
@@ -133,7 +133,7 @@ class PGoRpcApi {
         let signatureBuilder = Pogoprotos.Networking.Envelopes.Signature.Builder()
         
         for subrequest in subrequests {
-            print("Processing \(subrequest)...")
+//            print("Processing \(subrequest)...")
             let subrequestBuilder = Pogoprotos.Networking.Requests.Request.Builder()
             subrequestBuilder.requestType = subrequest.id
             subrequestBuilder.requestMessage = subrequest.message.data()
