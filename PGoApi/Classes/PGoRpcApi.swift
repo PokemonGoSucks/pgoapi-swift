@@ -155,7 +155,7 @@ class PGoRpcApi {
         if self.api.Location.speed != nil {
             locFix.speed = Float(self.api.Location.speed!) + Float.random(min: -0.01, max: 0.01)
         } else {
-            locFix.speed = Float.random(min: 1.0, max: 5.0)
+            locFix.speed = Float.random(min: 0.1, max: 3.0)
         }
         if self.api.Location.speed != nil {
             locFix.course = Float(self.api.Location.course!) + Float.random(min: -0.01, max: 0.01)
