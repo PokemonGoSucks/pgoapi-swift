@@ -328,7 +328,7 @@ public class PGoApiRequest {
         var cells: [UInt64] = []
         
         var currentCell = cell
-        for _ in 0..<10 {
+        for _ in 0..<13 {
             currentCell = currentCell.prev()
             cells.insert(currentCell.id, atIndex: 0)
         }
@@ -348,26 +348,22 @@ public class PGoApiRequest {
         messageBuilder.latitude = Location.lat
         messageBuilder.longitude = Location.long
         
-        if sinceTimestampMs != nil {
-            messageBuilder.sinceTimestampMs = sinceTimestampMs!
-        } else {
-            var timeStamps: Array<Int64> = []
-            if cellIds != nil {
-                for _ in cellIds! {
-                    timeStamps.append(0)
-                }
-                messageBuilder.sinceTimestampMs = timeStamps
-            } else {
-                messageBuilder.sinceTimestampMs = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
-            }
-        }
-        
         if cellIds != nil {
             messageBuilder.cellId = cellIds!
             
         } else {
             let cells = generateS2Cells(Location.lat, long: Location.long)
             messageBuilder.cellId = cells
+        }
+        
+        if sinceTimestampMs != nil {
+            messageBuilder.sinceTimestampMs = sinceTimestampMs!
+        } else {
+            var timeStamps: Array<Int64> = []
+            for _ in messageBuilder.cellId {
+                timeStamps.append(0)
+            }
+            messageBuilder.sinceTimestampMs = timeStamps
         }
         
         methodList.append(PGoApiMethod(id: .GetMapObjects, message: try! messageBuilder.build(), parser: { data in
