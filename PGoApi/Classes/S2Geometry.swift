@@ -60,7 +60,7 @@ public class S2Helper {
     public func initLookupCell(level: Int64, i: Int64, j: Int64, origOrientation: Int64, pos: Int64, orientation: Int64) {
         if level == S2Constants.lookupBits {
             let ij = (i << S2Constants.lookupBits) + j
-            lookupPos[Int(((ij << 2) + origOrientation))] = (pos << 2) + orientation
+            lookupPos[Int((ij << 2) + origOrientation)] = (pos << 2) + orientation
             lookupIJ[Int((pos << 2) + origOrientation)] = (ij << 2) + orientation
         } else {
             let _level = level + 1
