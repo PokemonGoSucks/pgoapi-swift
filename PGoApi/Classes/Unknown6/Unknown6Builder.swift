@@ -14,38 +14,40 @@ internal class LocationFixes {
     internal var timestamp:UInt64 = 0
     internal var lastTimesnap:UInt64 = 0
     internal var count: Int = 3
+    internal var maxTime: UInt64 = 1500
+    internal var timeInterval: UInt64 = 250
 }
 
 internal class LocationFix {
-    private let api: PGoApiRequest
+    fileprivate let api: PGoApiRequest
     
     internal init(api: PGoApiRequest) {
         self.api = api
         self.update()
     }
     
-    private func generateByCount(startAt: Int) {
-        let minFloor = floor(500/Double(self.api.locationFix.count))
-        let maxFloor = floor(750/Double(self.api.locationFix.count))
+    fileprivate func generateByCount(_ startAt: Int) {
+        let minFloor = floor((Double(self.api.locationFix.timeInterval) * Double(self.api.locationFix.count - 1))/Double(self.api.locationFix.count))
+        let maxFloor = floor((Double(self.api.locationFix.timeInterval) * Double(self.api.locationFix.count))/Double(self.api.locationFix.count))
         
         for i in startAt..<self.api.locationFix.count {
-            let minValue:UInt64 = 500 - (UInt64(minFloor) * UInt64(i))
-            let maxValue:UInt64 = 750 - (UInt64(maxFloor) * UInt64(i))
+            let minValue:UInt64 = (self.api.locationFix.timeInterval * UInt64(self.api.locationFix.count - 1)) - (UInt64(minFloor) * UInt64(i))
+            let maxValue:UInt64 = (self.api.locationFix.timeInterval * UInt64(self.api.locationFix.count)) - (UInt64(maxFloor) * UInt64(i))
             
             let newFix = generate(UInt64.random(minValue, max: maxValue))
             self.api.locationFix.builders.append(newFix)
         }
     }
     
-    private func getTimeSnapshot() -> UInt64 {
+    fileprivate func getTimeSnapshot() -> UInt64 {
         return self.api.getTimestamp() - self.api.locationFix.lastTimesnap
     }
     
-    private func getLastTimeSnapshot() -> UInt64 {
+    fileprivate func getLastTimeSnapshot() -> UInt64 {
         return self.api.locationFix.builders.last!.timestampSnapshot
     }
     
-    private func update() {
+    fileprivate func update() {
         self.api.locationFix.lastTimesnap = self.api.getTimestamp()
         if self.api.locationFix.builders.count == 0 {
             generateByCount(0)
@@ -53,18 +55,18 @@ internal class LocationFix {
             var countRemoved = 0
             for i in 0..<self.api.locationFix.count {
                 self.api.locationFix.builders[i].timestampSnapshot += getTimeSnapshot()
-                if self.api.locationFix.builders[i].timestampSnapshot < 1500 {
+                if self.api.locationFix.builders[i].timestampSnapshot < self.api.locationFix.maxTime {
                     countRemoved += 1
                 }
             }
             let removeRange = 0..<countRemoved
-            self.api.locationFix.builders.removeRange(removeRange)
+            self.api.locationFix.builders.removeSubrange(removeRange)
             generateByCount(self.api.locationFix.count - countRemoved)
         }
         self.api.locationFix.timestamp = getLastTimeSnapshot()
     }
     
-    private func generate(timeStamp: UInt64) -> Pogoprotos.Networking.Envelopes.Signature.LocationFix.Builder {
+    fileprivate func generate(_ timeStamp: UInt64) -> Pogoprotos.Networking.Envelopes.Signature.LocationFix.Builder {
         let locFix = Pogoprotos.Networking.Envelopes.Signature.LocationFix.Builder()
         locFix.provider = "fused"
         locFix.timestampSnapshot = self.api.getTimestampSinceStart() + timeStamp
@@ -92,31 +94,29 @@ internal class LocationFix {
 }
 
 internal class platformRequest {
-    private let encrypt: PGoEncrypt
-    private var locationHex: Array<UInt8>
-    private var authInfo: NSData? = nil
-    private var auth: PGoAuth
-    private let api: PGoApiRequest
+    fileprivate var locationHex: Array<UInt8>
+    fileprivate var authInfo: Data? = nil
+    fileprivate var auth: PGoAuth
+    fileprivate let api: PGoApiRequest
     internal let locationFix: LocationFix
     internal var requestHashes:Array<UInt64> = []
     
     internal init(auth: PGoAuth, api: PGoApiRequest) {
         self.locationHex = []
-        self.encrypt = PGoEncrypt()
         self.auth = auth
         self.api = api
         self.locationFix = LocationFix(api: api)
     }
     
-    private func locationToHex(lat: Double, long: Double, accuracy: Double) -> Array<UInt8> {
+    fileprivate func locationToHex(_ lat: Double, long: Double, accuracy: Double) -> Array<UInt8> {
         var LocationData: Array<UInt8> = []
-        LocationData.appendContentsOf(UnsafeConverter.bytes(lat).reverse())
-        LocationData.appendContentsOf(UnsafeConverter.bytes(long).reverse())
-        LocationData.appendContentsOf(UnsafeConverter.bytes(accuracy).reverse())
+        LocationData.append(contentsOf: UnsafeConverter.bytes(lat).reversed())
+        LocationData.append(contentsOf: UnsafeConverter.bytes(long).reversed())
+        LocationData.append(contentsOf: UnsafeConverter.bytes(accuracy).reversed())
         return LocationData
     }
     
-    private func getAuthData() -> Array<UInt8> {
+    fileprivate func getAuthData() -> Array<UInt8> {
         var authData: Array<UInt8> = []
         
         if auth.authToken != nil {
@@ -139,25 +139,22 @@ internal class platformRequest {
         return authData
     }
     
-    private func hashAuthTicket() -> UInt32 {
-        let xxh32:xxhash = xxhash()
-        let firstHash = xxh32.xxh32(0x61656632, input: getAuthData())
-        return xxh32.xxh32(firstHash, input: self.locationHex)
+    fileprivate func hashAuthTicket() -> UInt32 {
+        let firstHash = xxhash.xxh32(0x61656632, input: getAuthData())
+        return xxhash.xxh32(firstHash, input: self.locationHex)
     }
     
-    private func hashLocation() -> UInt32 {
-        let xxh32:xxhash = xxhash()
+    fileprivate func hashLocation() -> UInt32 {
         self.locationHex = locationToHex(self.api.Location.lat, long:self.api.Location.long, accuracy: self.api.Location.horizontalAccuracy)
-        return xxh32.xxh32(0x61656632, input: locationHex)
+        return xxhash.xxh32(0x61656632, input: locationHex)
     }
     
-    internal func hashRequest(requestData:NSData) -> UInt64 {
-        let xxh64:xxhash = xxhash()
-        let firstHash = xxh64.xxh64(0x61656632, input: getAuthData())
-        return xxh64.xxh64(firstHash, input: requestData.getUInt8Array())
+    internal func hashRequest(_ requestData:Data) -> UInt64 {
+        let firstHash = xxhash.xxh64(0x61656632, input: getAuthData())
+        return xxhash.xxh64(firstHash, input: requestData.getUInt8Array())
     }
     
-    private func getSensorInfo() -> Pogoprotos.Networking.Envelopes.Signature.SensorInfo {
+    fileprivate func getSensorInfo() -> Pogoprotos.Networking.Envelopes.Signature.SensorInfo {
         let sensorInfoBuilder = Pogoprotos.Networking.Envelopes.Signature.SensorInfo.Builder()
         sensorInfoBuilder.timestampSnapshot = self.api.getTimestampSinceStart() + self.api.unknown6Settings.randomizedTimeSnapshot
         sensorInfoBuilder.linearAccelerationX = Double(Float.random(min: -0.2, max: 0.14))
@@ -179,13 +176,14 @@ internal class platformRequest {
         return try! sensorInfoBuilder.build()
     }
     
-    private func getActivityStatus() -> Pogoprotos.Networking.Envelopes.Signature.ActivityStatus {
+    fileprivate func getActivityStatus() -> Pogoprotos.Networking.Envelopes.Signature.ActivityStatus {
         let activityDataBytes:[UInt8] = [72,1]
-        let activityStatus = try! Pogoprotos.Networking.Envelopes.Signature.ActivityStatus.parseFromData(NSData(bytes: activityDataBytes, length: activityDataBytes.count))
+        let activityStatus = try! Pogoprotos.Networking.Envelopes.Signature.ActivityStatus.parseFrom(data:
+            Data(bytes: activityDataBytes))
         return activityStatus
     }
     
-    private func getDeviceInfo() -> Pogoprotos.Networking.Envelopes.Signature.DeviceInfo {
+    fileprivate func getDeviceInfo() -> Pogoprotos.Networking.Envelopes.Signature.DeviceInfo {
         let deviceInfoBuilder = Pogoprotos.Networking.Envelopes.Signature.DeviceInfo.Builder()
         deviceInfoBuilder.deviceId = self.api.device.deviceId
         if self.api.device.androidBoardName != nil {
@@ -227,7 +225,7 @@ internal class platformRequest {
         return try! deviceInfoBuilder.build()
     }
     
-    private func getLocationFixes() -> [Pogoprotos.Networking.Envelopes.Signature.LocationFix] {
+    fileprivate func getLocationFixes() -> [Pogoprotos.Networking.Envelopes.Signature.LocationFix] {
         var fixes: [Pogoprotos.Networking.Envelopes.Signature.LocationFix] = []
         for i in 0..<self.api.locationFix.count {
             fixes.append(try! self.api.locationFix.builders[i].build())
@@ -246,7 +244,7 @@ internal class platformRequest {
         signatureBuilder.requestHash = self.requestHashes
         
         if self.api.session.sessionHash == nil {
-            self.api.session.sessionHash = NSData.randomBytes(16)
+            self.api.session.sessionHash = Data.randomBytes(16)
         }
         signatureBuilder.sessionHash = self.api.session.sessionHash!
         
@@ -272,14 +270,14 @@ internal class platformRequest {
         let unknown6 = Pogoprotos.Networking.Envelopes.RequestEnvelope.PlatformRequest.Builder()
         let unknown2 = Pogoprotos.Networking.Platform.Requests.SendEncryptedSignatureRequest.Builder()
         
-        unknown6.types = .SendEncryptedSignature
+        unknown6.type = .sendEncryptedSignature
         
-        let sigData = self.encrypt.encrypt(signature.data().getUInt8Array())
-        unknown2.encryptedSignature = NSData(bytes: sigData, length: sigData.count)
+        let sigData = PGoEncrypt.encrypt(signature.data().getUInt8Array())
+        unknown2.encryptedSignature = Data(bytes: sigData)
         
         unknown6.requestMessage = try! unknown2.build().data()
         let unknown6Version35 = try! unknown6.build()
-        
+                
         return unknown6Version35
     }
 
