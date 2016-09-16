@@ -128,7 +128,7 @@ internal class UnsafeConverter {
             value = Array(value[0..<4])
         }
         if value.count < 4 {
-            var bytesToAdd: [UInt8] = [UInt8](repeating: 0, count: 4 - value.count)
+            let bytesToAdd: [UInt8] = [UInt8](repeating: 0, count: 4 - value.count)
             value.append(contentsOf: bytesToAdd)
         }
         var newUInt32: UInt32 = 0
@@ -143,7 +143,7 @@ internal class UnsafeConverter {
             value = Array(value[0..<8])
         }
         if value.count < 8 {
-            var bytesToAdd: [UInt8] = [UInt8](repeating: 0, count: 8 - value.count)
+            let bytesToAdd: [UInt8] = [UInt8](repeating: 0, count: 8 - value.count)
             value.append(contentsOf: bytesToAdd)
         }
         var newUInt64: UInt64 = 0

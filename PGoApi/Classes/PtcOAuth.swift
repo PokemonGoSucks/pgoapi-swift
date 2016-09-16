@@ -29,7 +29,7 @@ open class PtcOAuth: PGoAuth {
         manager = Alamofire.SessionManager(configuration: configuration)
     }
     
-    fileprivate func getTicket(lt lt: String, execution: String) {
+    fileprivate func getTicket(lt: String, execution: String) {
         let parameters: [String:String] = [
             "lt": lt,
             "execution": execution,

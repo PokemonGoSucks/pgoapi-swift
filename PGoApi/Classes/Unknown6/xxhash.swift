@@ -25,10 +25,10 @@ open class xxhash {
     open static func xxh32(_ seed: UInt32, input: Array<UInt8>) -> UInt32 {
         var h32: UInt32
         var index: Int32 = 0
-        var len: Int32 = Int32(input.count)
+        let len: Int32 = Int32(input.count)
         
         if len >= 16 {
-            var limit = len - 16
+            let limit = len - 16
             var v1: UInt32 = seed &+ xxhash.PRIME32_1 &+ xxhash.PRIME32_2
             var v2: UInt32 = seed &+ xxhash.PRIME32_2
             var v3: UInt32 = seed &+ 0
