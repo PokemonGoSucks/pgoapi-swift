@@ -58,16 +58,16 @@ open class PGoLocationUtils {
         public var duration: Double
     }
     
-    open func getAltitudeAndHorizontalAccuracy(latitude: Double, longitude: Double, completionHandler: @escaping (_ altitude: Double?, _ horizontalAccuracy: Double?) -> ()) {
+    open func getAltitudeAndVerticalAccuracy(latitude: Double, longitude: Double, completionHandler: @escaping (_ altitude: Double?, _ horizontalAccuracy: Double?) -> ()) {
         /*
          
          Example func for completionHandler:
-         func receiveAltitudeAndHorizontalAccuracy(altitude: Double?, horizontalAccuracy: Double?)
+         func receiveAltitudeAndHorizontalAccuracy(altitude: Double?, verticalAccuracy: Double?)
          
          */
         Alamofire.request("https://maps.googleapis.com/maps/api/elevation/json?locations=\(latitude),\(longitude)&sensor=false").responseJSON { response in
                 var altitude:Double? = nil
-                var horizontalAccuracy:Double? = nil
+                var verticalAccuracy:Double? = nil
 
                 if let JSON = response.result.value {
                     let dict = JSON as! [String:AnyObject]
@@ -77,11 +77,11 @@ open class PGoLocationUtils {
                                 altitude = alt
                             }
                             if let horAcc = result[0]["resolution"] as? Double {
-                                horizontalAccuracy = horAcc
+                                verticalAccuracy = horAcc
                             }
                         }
                     }
-                    completionHandler(altitude, horizontalAccuracy)
+                    completionHandler(altitude, verticalAccuracy)
                 } else {
                     completionHandler(nil, nil)
                 }

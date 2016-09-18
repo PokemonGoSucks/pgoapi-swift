@@ -13,11 +13,11 @@ import Alamofire
 internal struct BinaryEncoding: ParameterEncoding {
     private let data: Data
     
-    init(data: Data) {
+    internal init(data: Data) {
         self.data = data
     }
     
-    public func encode(_ urlRequest: URLRequestConvertible, with parameters: Parameters?) throws -> URLRequest {
+    internal func encode(_ urlRequest: URLRequestConvertible, with parameters: Parameters?) throws -> URLRequest {
         let mutableRequest = urlRequest as! NSMutableURLRequest
         mutableRequest.httpBody = data
         return mutableRequest as URLRequest
@@ -33,7 +33,12 @@ internal extension NSRange {
 
 internal extension Data {
     internal func getUInt8Array() -> Array<UInt8> {
-        return Array(UnsafeBufferPointer(start: (self as NSData).bytes.bindMemory(to: UInt8.self, capacity: self.count), count: self.count))
+        var byteArray = [UInt8]()
+        self.withUnsafeBytes {(bytes: UnsafePointer<UInt8>)->Void in
+            let buffer = UnsafeBufferPointer(start: bytes, count: count);
+            byteArray = Array(buffer)
+        }
+        return byteArray
     }
     internal var getHexString: String {
         var bytes = [UInt8](repeating: 0, count: count)

@@ -9,13 +9,24 @@
 import Foundation
 
 
+internal class simpleLocationFixBuilder {
+    internal var timestampSnapshot: UInt64 = 0
+    internal var latitude: Float = 0
+    internal var longitude: Float = 0
+    internal var altitude: Float = 0
+    internal var speed: Float = 0
+    internal var course: Float = 0
+    internal var verticalAccuracy: Float? = nil
+    internal var floor: UInt32? = nil
+    internal var horizontalAccuracy: Float = 0
+}
+
 internal class LocationFixes {
-    internal var builders: Array<Pogoprotos.Networking.Envelopes.Signature.LocationFix.Builder> =  []
-    internal var timestamp:UInt64 = 0
-    internal var lastTimesnap:UInt64 = 0
-    internal var count: Int = 3
-    internal var maxTime: UInt64 = 1500
-    internal var timeInterval: UInt64 = 250
+    internal var builders: Array<simpleLocationFixBuilder> =  []
+    internal var timeStamp: UInt64 = 0
+    internal var lastTimeSnap:UInt64 = 0
+    internal var count: Int = 28
+    internal var errorChance: UInt32 = 25
 }
 
 internal class LocationFix {
@@ -26,59 +37,89 @@ internal class LocationFix {
         self.update()
     }
     
-    fileprivate func generateByCount(_ startAt: Int) {
-        let minFloor = floor((Double(self.api.locationFix.timeInterval) * Double(self.api.locationFix.count - 1))/Double(self.api.locationFix.count))
-        let maxFloor = floor((Double(self.api.locationFix.timeInterval) * Double(self.api.locationFix.count))/Double(self.api.locationFix.count))
-        
-        for i in startAt..<self.api.locationFix.count {
-            let minValue:UInt64 = (self.api.locationFix.timeInterval * UInt64(self.api.locationFix.count - 1)) - (UInt64(minFloor) * UInt64(i))
-            let maxValue:UInt64 = (self.api.locationFix.timeInterval * UInt64(self.api.locationFix.count)) - (UInt64(maxFloor) * UInt64(i))
-            
-            let newFix = generate(UInt64.random(minValue, max: maxValue))
-            self.api.locationFix.builders.append(newFix)
+    fileprivate func getTimeStampFix() -> UInt64 {
+        return self.api.getTimestampSinceStart() + self.api.session.realisticStartTimeAdjustment - 500
+    }
+    
+    fileprivate func generatedByCount(count: Int, startTime: UInt64? = 0) {
+        for i in 0..<count {
+            let newTime = 1000 * UInt64(count-i) - UInt64.random(0, max: 100) + 100
+            self.api.locationFix.builders.insert(generate(timeStamp: newTime), at: 0)
         }
     }
     
-    fileprivate func getTimeSnapshot() -> UInt64 {
-        return self.api.getTimestamp() - self.api.locationFix.lastTimesnap
+    fileprivate func getCount() -> Int {
+        var count: Int = 0
+        let timestampFix = getTimeStampFix()
+        if timestampFix > UInt64(self.api.locationFix.count * 1000) {
+            count = self.api.locationFix.count
+        } else {
+            count = Int(round(Double(timestampFix)/1000))
+        }
+        return count
     }
     
     fileprivate func getLastTimeSnapshot() -> UInt64 {
-        return self.api.locationFix.builders.last!.timestampSnapshot
+        return self.api.locationFix.builders.first!.timestampSnapshot
     }
     
     fileprivate func update() {
-        self.api.locationFix.lastTimesnap = self.api.getTimestamp()
         if self.api.locationFix.builders.count == 0 {
-            generateByCount(0)
+            generatedByCount(count: getCount())
         } else {
-            var countRemoved = 0
-            for i in 0..<self.api.locationFix.count {
-                self.api.locationFix.builders[i].timestampSnapshot += getTimeSnapshot()
-                if self.api.locationFix.builders[i].timestampSnapshot < self.api.locationFix.maxTime {
-                    countRemoved += 1
+            let missing = getCount() - self.api.locationFix.builders.count
+            let timeAdd = getTimeStampFix() - self.api.locationFix.lastTimeSnap
+            if missing > 0 {
+                for i in 0..<self.api.locationFix.builders.count {
+                    self.api.locationFix.builders[i].timestampSnapshot += timeAdd
                 }
+                generatedByCount(count: missing)
+            } else {
+                var countRemoved = Int(round(Double(timeAdd)/1000))
+                for i in 0..<countRemoved {
+                    self.api.locationFix.builders.removeLast()
+                }
+                for i in 0..<self.api.locationFix.builders.count {
+                    self.api.locationFix.builders[i].timestampSnapshot += timeAdd
+                }
+                generatedByCount(count: countRemoved)
             }
-            let removeRange = 0..<countRemoved
-            self.api.locationFix.builders.removeSubrange(removeRange)
-            generateByCount(self.api.locationFix.count - countRemoved)
         }
-        self.api.locationFix.timestamp = getLastTimeSnapshot()
+        self.api.locationFix.lastTimeSnap = getTimeStampFix()
+        self.api.locationFix.timeStamp = getLastTimeSnapshot()
     }
     
-    fileprivate func generate(_ timeStamp: UInt64) -> Pogoprotos.Networking.Envelopes.Signature.LocationFix.Builder {
-        let locFix = Pogoprotos.Networking.Envelopes.Signature.LocationFix.Builder()
-        locFix.provider = "fused"
-        locFix.timestampSnapshot = self.api.getTimestampSinceStart() + timeStamp
-        locFix.latitude = Float(self.api.Location.lat) + Float.random(min: -0.01, max: 0.01)
-        locFix.longitude = Float(self.api.Location.long) + Float.random(min: -0.01, max: 0.01)
+    fileprivate func generate(timeStamp: UInt64) -> simpleLocationFixBuilder {
+        var locFix = simpleLocationFixBuilder()
+        locFix.timestampSnapshot = timeStamp
+        let chance = arc4random_uniform(100)
+        if chance < UInt32(self.api.locationFix.errorChance) {
+            if self.api.Location.lat < 0 {
+                locFix.latitude = -360
+            } else {
+                locFix.latitude = 360
+            }
+            if self.api.Location.long < 0 {
+                locFix.longitude = -360
+            } else {
+                locFix.longitude = 360
+            }
+        } else {
+            locFix.latitude = Float(self.api.Location.lat) + Float.random(min: -0.01, max: 0.01)
+            locFix.longitude = Float(self.api.Location.long) + Float.random(min: -0.01, max: 0.01)
+        }
         locFix.altitude = Float(self.api.Location.alt) + Float.random(min: -0.01, max: 0.01)
+        if self.api.device.devicePlatform == .ios {
+            locFix.verticalAccuracy = Float(self.api.Location.verticalAccuracy) + Float.random(min: -0.01, max: 0.01)
+        }
+        
+        locFix.horizontalAccuracy = Float(self.api.Location.horizontalAccuracy) + Float.random(min: -0.01, max: 0.01)
         if self.api.Location.speed != nil {
             locFix.speed = Float(self.api.Location.speed!) + Float.random(min: -0.01, max: 0.01)
         } else {
             locFix.speed = Float.random(min: 0.1, max: 3.0)
         }
-        if self.api.Location.speed != nil {
+        if self.api.Location.course != nil {
             locFix.course = Float(self.api.Location.course!) + Float.random(min: -0.01, max: 0.01)
         } else {
             locFix.course = Float.random(min: 0, max: 360)
@@ -86,9 +127,6 @@ internal class LocationFix {
         if self.api.Location.floor != nil {
             locFix.floor = self.api.Location.floor!
         }
-        locFix.course = Float(self.api.Location.horizontalAccuracy) + Float.random(min: -0.01, max: 0.01)
-        locFix.providerStatus = 3
-        locFix.locationType = 1
         return locFix
     }
 }
@@ -124,7 +162,7 @@ internal class platformRequest {
         } else {
             authData = self.authInfo!.getUInt8Array()
         }
-        
+
         return authData
     }
     
@@ -227,8 +265,25 @@ internal class platformRequest {
     
     fileprivate func getLocationFixes() -> [Pogoprotos.Networking.Envelopes.Signature.LocationFix] {
         var fixes: [Pogoprotos.Networking.Envelopes.Signature.LocationFix] = []
-        for i in 0..<self.api.locationFix.count {
-            fixes.append(try! self.api.locationFix.builders[i].build())
+        for i in 0..<self.api.locationFix.builders.count {
+            let locFix = Pogoprotos.Networking.Envelopes.Signature.LocationFix.Builder()
+            locFix.provider = "fused"
+            locFix.timestampSnapshot = self.api.locationFix.builders[i].timestampSnapshot + self.api.getTimestampSinceStart() + self.api.session.realisticStartTimeAdjustment - 500
+            locFix.latitude = self.api.locationFix.builders[i].latitude
+            locFix.longitude = self.api.locationFix.builders[i].longitude
+            locFix.altitude = self.api.locationFix.builders[i].altitude
+            locFix.speed = self.api.locationFix.builders[i].speed
+            locFix.course = self.api.locationFix.builders[i].course
+            if self.api.locationFix.builders[i].floor != nil {
+                locFix.floor = self.api.locationFix.builders[i].floor!
+            }
+            if self.api.locationFix.builders[i].verticalAccuracy != nil {
+                locFix.verticalAccuracy = self.api.locationFix.builders[i].verticalAccuracy!
+            }
+            locFix.horizontalAccuracy = self.api.locationFix.builders[i].horizontalAccuracy
+            locFix.providerStatus = 3
+            locFix.locationType = 1
+            fixes.append(try! locFix.build())
         }
         return fixes
     }
@@ -264,7 +319,7 @@ internal class platformRequest {
         if self.api.unknown6Settings.useSensorInfo {
             signatureBuilder.sensorInfo = getSensorInfo()
         }
-        
+                
         let signature = try! signatureBuilder.build()
         
         let unknown6 = Pogoprotos.Networking.Envelopes.RequestEnvelope.PlatformRequest.Builder()

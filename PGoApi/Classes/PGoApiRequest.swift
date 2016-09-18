@@ -34,6 +34,7 @@ public struct PGoLocation {
     public var long:Double = 0
     public var alt:Double = 6
     public var horizontalAccuracy: Double = 3.9
+    public var verticalAccuracy: Double = 6.1
     public var speed: Double? = nil
     public var course: Double? = nil
     public var floor: UInt32? = nil
@@ -108,11 +109,15 @@ open class PGoApiRequest {
         } else {
             self.session.requestId = UInt64.random(4611686018427388000, max: 9223372036854776000)
             self.session.timeSinceStart = getTimestamp()
-            self.session.realisticStartTimeAdjustment = UInt64.random(750, max: 2000)
+            self.session.realisticStartTimeAdjustment = UInt64.random(1000, max: 2000)
         }
         
         if Location != nil {
             self.Location = Location!
+        } else {
+            self.Location.horizontalAccuracy = Double(Float.random(min: 3.5, max: 5.0))
+            self.Location.verticalAccuracy = Double(Float.random(min: 5.0, max: 7.0))
+            self.Location.alt = Double(Float.random(min: 6, max: 100))
         }
         
         if device != nil {
@@ -220,10 +225,9 @@ open class PGoApiRequest {
         unknown6Settings.useLocationFix = useLocationFix
     }
     
-    open func setLocationFixSettings(locationFixCount: Int? = 3, timeInterval: UInt64? = 250, maxTime: UInt64? = 1500) {
+    open func setLocationFixSettings(locationFixCount: Int? = 28, errorChance: UInt32? = 25) {
         locationFix.count = locationFixCount!
-        locationFix.timeInterval = timeInterval!
-        locationFix.maxTime = maxTime!
+        locationFix.errorChance = errorChance!
     }
     
     open func setDevice(deviceId: String? = nil, androidBoardName: String? = nil, androidBootloader: String? = nil, deviceModel: String? = nil, deviceBrand: String? = nil, deviceModelIdentifier: String? = nil, deviceModelBoot: String? = nil, hardwareManufacturer: String? = nil, hardwareModel: String? = nil, firmwareBrand: String? = nil, firmwareTags: String? = nil, firmwareType: String? = nil, firmwareFingerprint: String? = nil, devicePlatform: Pogoprotos.Enums.Platform? = .ios) {
@@ -842,9 +846,11 @@ open class PGoApiRequest {
         
     }
     
-    fileprivate func checkChallenge(debug: Bool? = false) {
+    fileprivate func checkChallenge(debug: Bool? = nil) {
         let messageBuilder = Pogoprotos.Networking.Requests.Messages.CheckChallengeMessage.Builder()
-        messageBuilder.debugRequest = debug!
+        if debug != nil {
+            messageBuilder.debugRequest = debug!
+        }
         methodList.insert(PGoApiMethod(id: .checkChallenge, message: try! messageBuilder.build(), parser: { data in
             return try! Pogoprotos.Networking.Responses.CheckChallengeResponse.parseFrom(data: data)
         }), at: 1)
