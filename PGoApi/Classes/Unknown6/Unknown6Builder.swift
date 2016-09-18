@@ -75,8 +75,8 @@ internal class LocationFix {
                 }
                 generatedByCount(count: missing)
             } else {
-                var countRemoved = Int(round(Double(timeAdd)/1000))
-                for i in 0..<countRemoved {
+                let countRemoved = Int(round(Double(timeAdd)/1000))
+                for _ in 0..<countRemoved {
                     self.api.locationFix.builders.removeLast()
                 }
                 for i in 0..<self.api.locationFix.builders.count {
@@ -90,7 +90,7 @@ internal class LocationFix {
     }
     
     fileprivate func generate(timeStamp: UInt64) -> simpleLocationFixBuilder {
-        var locFix = simpleLocationFixBuilder()
+        let locFix = simpleLocationFixBuilder()
         locFix.timestampSnapshot = timeStamp
         let chance = arc4random_uniform(100)
         if chance < UInt32(self.api.locationFix.errorChance) {
